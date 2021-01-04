@@ -147,10 +147,6 @@ class Post:
             )
             self._full_metadata_dict = pic_json['data']['shortcode_media']
             if self._full_metadata_dict is None:
-                # issue #449
-                self._context.error("Fetching Post metadata failed (issue #449). "
-                                    "The following data has been returned:\n"
-                                    + json.dumps(pic_json['entry_data'], indent=2))
                 raise BadResponseException("Fetching Post metadata failed.")
             if self.shortcode != self._full_metadata_dict['shortcode']:
                 self._node.update(self._full_metadata_dict)
@@ -441,7 +437,14 @@ class Post:
         )
 
     def get_likes(self) -> Iterator['Profile']:
-        """Iterate over all likes of the post. A :class:`Profile` instance of each likee is yielded."""
+        """
+        Iterate over all likes of the post. A :class:`Profile` instance of each likee is yielded.
+
+        .. versionchanged:: 4.5.4
+           Require being logged in (as required by Instagram).
+        """
+        if not self._context.is_logged_in:
+            raise LoginRequiredException("--login required to access likes of a post.")
         if self.likes == 0:
             # Avoid doing additional requests if there are no comments
             return
@@ -1083,14 +1086,14 @@ class Story:
 
     @property
     def last_seen_local(self) -> Optional[datetime]:
-        """Timestamp when the story has last been watched or None (local time zone)."""
+        """Timestamp of the most recent StoryItem that has been watched or None (local time zone)."""
         if self._node['seen']:
             return datetime.fromtimestamp(self._node['seen'])
         return None
 
     @property
     def last_seen_utc(self) -> Optional[datetime]:
-        """Timestamp when the story has last been watched or None (UTC)."""
+        """Timestamp of the most recent StoryItem that has been watched or None (UTC)."""
         if self._node['seen']:
             return datetime.utcfromtimestamp(self._node['seen'])
         return None
@@ -1356,9 +1359,13 @@ class Hashtag:
         next_other = next(other_posts, None)
         while next_top is not None or next_other is not None:
             if next_other is None:
+                assert next_top is not None
+                yield next_top
                 yield from sorted_top_posts
                 break
             if next_top is None:
+                assert next_other is not None
+                yield next_other
                 yield from other_posts
                 break
             if next_top == next_other:

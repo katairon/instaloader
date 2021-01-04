@@ -579,12 +579,12 @@ class Instaloader:
 
         def _userid_chunks():
             assert userids is not None
-            userids_per_query = 100
+            userids_per_query = 50
             for i in range(0, len(userids), userids_per_query):
                 yield userids[i:i + userids_per_query]
 
         for userid_chunk in _userid_chunks():
-            stories = self.context.graphql_query("bf41e22b1c4ba4c9f31b844ebb7d9056",
+            stories = self.context.graphql_query("303a4ae99711322310f25250d988f3b7",
                                                  {"reel_ids": userid_chunk, "precomposed_overlay": False})["data"]
             yield from (Story(self.context, media) for media in stories['reels_media'])
 
@@ -1129,10 +1129,13 @@ class Instaloader:
                     self.save_metadata_json(json_filename, profile)
 
                 # Catch some errors
-                if profile.is_private and (tagged or igtv or highlights or posts):
-                    if not self.context.is_logged_in:
+                if tagged or igtv or highlights or posts:
+                    if (not self.context.is_logged_in and
+                            profile.is_private):
                         raise LoginRequiredException("--login=USERNAME required.")
-                    if not profile.followed_by_viewer and self.context.username != profile.username:
+                    if (self.context.username != profile.username and
+                            profile.is_private and
+                            not profile.followed_by_viewer):
                         raise PrivateProfileNotFollowedException("Private but not followed.")
 
                 # Download tagged, if requested
